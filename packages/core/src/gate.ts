@@ -10,7 +10,8 @@ export function makeGate(def: AgentDefinition, runId: string) {
   const audit = new AuditLogger(runId, def.id);
   return async (toolName: string, input: Record<string, unknown>) => {
     await audit.intent(toolName, input);
-    const bare = toolName.replace(/^mcp__[^_]+__/, "");
+    // Lazy match: server names may contain underscores (mcp__crm_notes__list_leads -> list_leads).
+    const bare = toolName.replace(/^mcp__.+?__/, "");
     if (!def.allowedTools.includes(bare)) {
       const d = { decision: "deny" as const, reason: `Tool ${bare} is not whitelisted for ${def.id}` };
       await audit.policy(toolName, input, d);
