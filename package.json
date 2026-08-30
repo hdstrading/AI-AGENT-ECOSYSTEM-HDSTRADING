@@ -1,0 +1,36 @@
+{
+  "name": "hds-agents",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HDS Trading OPC / Maxx Klean AI agent ecosystem",
+  "scripts": {
+    "build": "tsc -b",
+    "dev:orchestrator": "tsx watch apps/orchestrator/src/server.ts",
+    "agent:auditor": "tsx packages/agents/src/auditor/run.ts",
+    "agent:inventory": "tsx packages/agents/src/inventory-manager/run.ts",
+    "db:migrate": "tsx packages/core/src/db/migrate.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/pg": "^8.11.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "fastify": "^5.0.0",
+    "pg": "^8.13.0",
+    "zod": "^4.0.0",
+    "pino": "^9.4.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module"
+}

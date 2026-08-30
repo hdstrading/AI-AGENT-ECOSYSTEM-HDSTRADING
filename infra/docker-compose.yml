@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: hds, POSTGRES_PASSWORD: changeme, POSTGRES_DB: hds_agents }
+    volumes: [ pgdata:/var/lib/postgresql/data ]
+    restart: unless-stopped
+  orchestrator:
+    build: { context: .., dockerfile: infra/Dockerfile }
+    env_file: ../.env
+    environment: { DATABASE_URL: postgres://hds:changeme@postgres:5432/hds_agents }
+    depends_on: [ postgres ]
+    ports: [ "127.0.0.1:4000:4000" ]
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports: [ "80:80", "443:443" ]
+    volumes: [ ./Caddyfile:/etc/caddy/Caddyfile, caddy_data:/data ]
+    restart: unless-stopped
+volumes: { pgdata: {}, caddy_data: {} }
