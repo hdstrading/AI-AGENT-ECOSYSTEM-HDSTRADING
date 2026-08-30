@@ -1,0 +1,3 @@
+agents.hdstradingopc.com {
+    reverse_proxy orchestrator:4000
+}

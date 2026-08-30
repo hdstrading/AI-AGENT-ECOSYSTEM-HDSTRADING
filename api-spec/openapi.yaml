@@ -1,0 +1,178 @@
+openapi: 3.1.0
+info:
+  title: HDS Trading OPC — Shared Agent API Contract
+  version: 1.0.0
+  description: |
+    One contract, four systems. Every HDS system (inventory, crm, accounting, payroll)
+    exposes this shape under /api/v1. System-specific resources are listed under tags.
+    Rules: Bearer API key per agent; scope enforced server-side; IP allowlist to agents VPS;
+    every write requires Idempotency-Key and records actor; read endpoints ship first.
+servers:
+  - url: https://inventory.hdstradingopc.com/api/v1
+  - url: https://crm.hdstradingopc.com/api/v1
+  - url: https://accounting.hdstradingopc.com/api/v1
+  - url: https://payroll.hdstradingopc.com/api/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    Page:  { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+    Since: { name: since, in: query, description: ISO-8601; return records changed after this, schema: { type: string, format: date-time } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  schemas:
+    Error:
+      type: object
+      required: [error, code]
+      properties:
+        error: { type: string }
+        code:  { type: string, enum: [unauthorized, forbidden, not_found, validation, conflict, rate_limited, internal] }
+        details: { type: object, additionalProperties: true }
+    Paged:
+      type: object
+      required: [data, page, limit, total]
+      properties:
+        data:  { type: array, items: {} }
+        page:  { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+    AuditEntry:
+      type: object
+      required: [id, at, actor, action, resource, resource_id]
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        actor: { type: string, description: "human:<user_id> | agent:<agent_id>" }
+        action: { type: string, enum: [create, update, delete] }
+        resource: { type: string }
+        resource_id: { type: string }
+        before: { type: object, additionalProperties: true }
+        after:  { type: object, additionalProperties: true }
+        idempotency_key: { type: string }
+    Health:
+      type: object
+      required: [status, system, version, time]
+      properties:
+        status:  { type: string, enum: [ok, degraded] }
+        system:  { type: string, enum: [inventory, crm, accounting, payroll] }
+        version: { type: string }
+        time:    { type: string, format: date-time }
+    # ---------- Inventory ----------
+    Product:
+      type: object
+      required: [id, sku, name, brand, unit, cost_php, price_php, active]
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        name: { type: string }
+        brand: { type: string, enum: [MAXX KLEAN, MISISPRO, OTHER] }
+        category: { type: string }
+        unit: { type: string, description: "e.g. L, gal, pc" }
+        cost_php: { type: number }
+        price_php: { type: number }
+        reorder_point: { type: number }
+        active: { type: boolean }
+    StockLevel:
+      type: object
+      required: [product_id, warehouse_id, on_hand, reserved, available]
+      properties:
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        on_hand: { type: number }
+        reserved: { type: number }
+        available: { type: number }
+        updated_at: { type: string, format: date-time }
+    StockMovement:
+      type: object
+      required: [id, product_id, warehouse_id, qty, type, at, actor]
+      properties:
+        id: { type: string }
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        qty: { type: number, description: "signed; negative = out" }
+        type: { type: string, enum: [receipt, sale, adjustment, transfer, return, production] }
+        reference: { type: string }
+        reason: { type: string }
+        at: { type: string, format: date-time }
+        actor: { type: string }
+    StockAdjustmentDraft:
+      type: object
+      required: [product_id, warehouse_id, qty, reason]
+      properties:
+        product_id: { type: string }
+        warehouse_id: { type: string }
+        qty: { type: number }
+        reason: { type: string, minLength: 10 }
+        approved_by: { type: string, description: "human user id; required when abs(qty*cost) > threshold" }
+    Supplier:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        contact: { type: string }
+        lead_time_days: { type: integer }
+        product_ids: { type: array, items: { type: string } }
+paths:
+  /health:
+    get:
+      tags: [common]
+      security: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Health' } } } }
+  /audit:
+    get:
+      tags: [common]
+      summary: Recent changes with actor — read by the Team Auditor
+      parameters: [ { $ref: '#/components/parameters/Since' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } }
+  # ---------- Inventory (inventory.hdstradingopc.com) ----------
+  /products:
+    get:
+      tags: [inventory]
+      parameters: [ { $ref: '#/components/parameters/Since' }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' }, { name: brand, in: query, schema: { type: string } }, { name: active, in: query, schema: { type: boolean } } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } } }
+  /products/{id}:
+    get:
+      tags: [inventory]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }, '404': { description: Not found } }
+  /stock:
+    get:
+      tags: [inventory]
+      summary: Current stock levels
+      parameters: [ { name: warehouse_id, in: query, schema: { type: string } }, { name: product_id, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } } }
+  /stock/low:
+    get:
+      tags: [inventory]
+      summary: Products at or below reorder point
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } } }
+  /movements:
+    get:
+      tags: [inventory]
+      parameters: [ { $ref: '#/components/parameters/Since' }, { name: product_id, in: query, schema: { type: string } }, { name: type, in: query, schema: { type: string } }, { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } } }
+  /suppliers:
+    get:
+      tags: [inventory]
+      parameters: [ { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/Limit' } ]
+      responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Paged' } } } } }
+  /adjustments:
+    post:
+      tags: [inventory]
+      summary: Stock adjustment (WRITE — Phase 2). Scope inventory:write. Large values require approved_by.
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StockAdjustmentDraft' } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/StockMovement' } } } }
+        '403': { description: Missing approval or scope }
+        '409': { description: Idempotency-Key already used with different payload }
+  # ---------- CRM / Accounting / Payroll: same conventions; resources per docs/phase0-api-plan.md ----------
