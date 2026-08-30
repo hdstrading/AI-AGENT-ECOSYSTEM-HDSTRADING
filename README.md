@@ -10,6 +10,8 @@ packages/core/       audit logger, policy gate, approval queue, HDS HTTP client,
 packages/mcp-inventory/  MCP server for inventory.hdstradingopc.com
 packages/agents/     one folder per agent: definition.ts (whitelist+policy), prompt.md, run.ts
 apps/orchestrator/   Fastify: approvals inbox, runs, findings, triggers, daily schedule
+apps/stub-inventory/ fixture-backed stand-in for the inventory API, so Phase 1 runs before Phase 0 ships
+scripts/             smoke-inventory.ts - conformance check for the inventory contract
 infra/               docker-compose (Postgres + orchestrator + Caddy), Dockerfile, Caddyfile
 docs/                Phase 0 plan
 ```
@@ -19,6 +21,8 @@ docs/                Phase 0 plan
 cp .env.example .env            # fill ANTHROPIC_API_KEY, DATABASE_URL, INVENTORY_API_URL, agent keys
 npm install
 npm run db:migrate
+npm run dev:stub-inventory &                             # fake inventory API on :4010
+npm run smoke:inventory                                  # 28 conformance checks against it
 npm run agent:inventory -- "Daily stock health check"     # first agent run
 npm run agent:auditor                                    # audits the last 24h
 npm run dev:orchestrator                                 # http://localhost:4000
@@ -51,6 +55,13 @@ System side: API key scope + idempotency + api_audit. Auditor nightly compares b
 3. `packages/agents/src/<agent>/prompt.md` — role, values, output format
 4. `packages/agents/src/<agent>/run.ts` — wire runner + MCP
 5. Register in `apps/orchestrator` SCRIPTS + schedule; issue a scoped API key on the system side
+
+## Running without the real systems
+Phase 0 has not shipped, so every inventory endpoint the agents call is still hypothetical.
+`apps/stub-inventory` implements that contract against fixtures — start it, point
+`INVENTORY_API_URL` at it, and the whole chain (runner - gate - MCP - approval - orchestrator)
+runs end to end. See `apps/stub-inventory/README.md`. Once Phase 0 is real, aim
+`npm run smoke:inventory` at it via `INVENTORY_API_URL` and it becomes the acceptance test.
 
 ## Notes
 - Verify `@anthropic-ai/claude-agent-sdk` option names (`canUseTool`, `mcpServers`, `createSdkMcpServer`) against the installed version's docs; this scaffold was typechecked against 0.3.x.

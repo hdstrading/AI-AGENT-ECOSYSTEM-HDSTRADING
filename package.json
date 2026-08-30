@@ -9,6 +9,8 @@
     "agent:auditor": "tsx packages/agents/src/auditor/run.ts",
     "agent:inventory": "tsx packages/agents/src/inventory-manager/run.ts",
     "db:migrate": "tsx packages/core/src/db/migrate.ts",
+    "dev:stub-inventory": "tsx apps/stub-inventory/src/server.ts",
+    "smoke:inventory": "tsx scripts/smoke-inventory.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

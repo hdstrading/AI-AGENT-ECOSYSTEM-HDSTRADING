@@ -11,5 +11,5 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["packages/**/*.ts", "apps/**/*.ts", "api-spec/middleware/*.ts"]
+  "include": ["packages/**/*.ts", "apps/**/*.ts", "api-spec/middleware/*.ts", "scripts/**/*.ts"]
 }
